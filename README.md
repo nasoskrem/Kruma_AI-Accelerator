@@ -1,43 +1,69 @@
-# KRUMA — CPU AI Accelerator Core
+# KRUMA — High-Performance CPU AI Core
 
-![Version](https://img.shields.io/badge/version-0.1.2-blue)
+![Version](https://img.shields.io/badge/version-0.2.0-blue)
 ![Rust](https://img.shields.io/badge/Made%20With-Rust-informational)
-![Status](https://img.shields.io/badge/status-Prototype-yellow)
+![Status](https://img-shields.io/badge/status-Advanced%20Prototype-yellowgreen)
 
-**KRUMA** is a low-level, high-performance **CPU-based AI accelerator** built in Rust, designed to mimic the abstractions and operations of GPU tensor libraries like CUDA or Metal — but without requiring dedicated hardware. It supports SIMD vectorization and multithreaded compute for fundamental AI operations like matrix multiplication and ReLU.
-
----
-
-## ✨ Features (v0.1.2)
-
-### ✅ Core Abstractions
-- `DeviceBuffer` — High-performance memory buffer with both scalar and SIMD views.
-- `HardwareBackend` — Modular backend trait for custom CPU/GPU execution engines.
-
-### ✅ Implemented Backend
-- **`CpuBackend`**:  
-  - Multithreaded via `rayon`  
-  - SIMD-accelerated via `wide::f32x4`  
-  - Supports:
-    - Matrix multiplication (`matmul`)
-    - ReLU activation (`relu`, `relu_inplace`)
-
-### ✅ SIMD & Parallelism
-- Vectorized ops using `f32x4`
-- Automatic parallelization with `rayon::par_iter`
+**KRUMA** is a low-level, high-performance **CPU-based AI core** built in Rust. Its primary goal is to provide fundamental tensor operations and network abstractions similar to larger frameworks, optimized specifically for standard multi-core CPUs. It leverages **SIMD vectorization** and **multithreading** to achieve significant performance gains.
 
 ---
 
-## 📦 Usage Example
+## ✨ Features (v0.2.0)
+
+### 🚀 Core Acceleration (`backend/cpu.rs`)
+- **Matrix Multiplication (`matmul`)**: Optimized with **Parallel Transposition**, **4x4 Register Blocking**, and **SIMD (f32x4)** for efficient compute on large tensors.
+- **Parallelism**: Multithreaded execution via `rayon` is utilized across all key tensor and backend operations.
+- **Key Operations**: Stable, parallelized implementations of `relu`, `sigmoid`, `tanh`, `softmax`, `log_softmax`, and `sum_columns` (reduction).
+
+### 🧠 Deep Learning Modules (`nn`, `optim`, `loss`)
+- **Network Abstractions (`nn`)**:
+  - `Sequential` container for creating modular, stacked network architectures.
+  - `Linear` Layer with batch-aware gradient calculation using `sum_axis0`.
+  - **Regularization**: `Dropout` layer (uses pseudo-RNG for training).
+  - **Activations**: `Tanh`, `Sigmoid`, and `ReLU`.
+- **Optimization (`optim`)**:
+  - **Adam** (Adaptive Moment Estimation) optimizer for adaptive learning rate control.
+- **Loss Functions (`loss`)**:
+  - **`CrossEntropyLoss`** (for stable multi-class classification).
+  - `MSELoss` (Mean Squared Error).
+
+### 📐 Tensor Utilities
+- Fundamental ops: `add`, `sub`, `mul`, `transpose`, `sum_axis0`.
+- Utility: `argmax` (for extracting class predictions).
+
+---
+
+## 📦 Usage Example (Multi-Class Classification)
+
+This demonstrates a full training loop using Sequential, Adam, and CrossEntropyLoss.
 
 ```rust
-use kruma::{DeviceBuffer, CpuBackend, HardwareBackend};
+use kruma::tensor::Tensor;
+use kruma::nn::{Linear, Tanh, Sequential, Dropout};
+use kruma::optim::Adam;
+use kruma::loss::CrossEntropyLoss;
 
-let a = DeviceBuffer::from_slice(&[1.0, 2.0, 3.0, 4.0]);
-let b = DeviceBuffer::from_slice(&[5.0, 6.0, 7.0, 8.0]);
-let mut c = DeviceBuffer::new(4);
+// 1. Define Model Architecture
+let mut model = Sequential::new(vec![
+    Box::new(Linear::new(3, 8)),
+    Box::new(Tanh::new()),
+    Box::new(Dropout::new(0.2)), 
+    Box::new(Linear::new(8, 3)),
+]);
 
-let backend = CpuBackend;
-backend.matmul(&a, &b, &mut c);
+// 2. Setup Optimizer & Data
+let mut optimizer = Adam::new(0.01);
+let criterion = CrossEntropyLoss;
+let x_train = Tensor::from_data([6, 3], /* ... data ... */);
+let y_train = Tensor::from_data([6, 3], /* ... targets ... */);
 
-println!("{:?}", c.as_slice());
+// 3. Training Step
+let logits = model.forward(&x_train);
+let loss = criterion.forward(&logits, &y_train);
+
+optimizer.zero_grad(&mut model);
+let grad = criterion.backward(&logits, &y_train);
+model.backward(&grad);
+optimizer.step(&mut model);
+
+println!("Loss: {}", loss);
