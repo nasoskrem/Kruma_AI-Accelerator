@@ -9,7 +9,8 @@ pub struct DeviceBuffer {
 impl DeviceBuffer {
     pub fn new(size: usize) -> Self {
         let mut data: Vec<f32> = Vec::with_capacity(size);
-        unsafe { data.set_len(size) };
+        // Initialize with zeros to avoid garbage data
+        data.resize(size, 0.0);
         Self { data }
     }
 
@@ -17,6 +18,10 @@ impl DeviceBuffer {
         Self {
             data: slice.to_vec(),
         }
+    }
+
+    pub fn into_vec(self) -> Vec<f32> {
+        self.data
     }
 
     pub fn as_slice(&self) -> &[f32] {
@@ -56,6 +61,7 @@ pub struct Tensor<T, const D: usize> {
 }
 
 impl<T: Default + Clone, const D: usize> Tensor<T, D> {
+    
     pub fn new(shape: [usize; D]) -> Self {
         let strides = Self::compute_strides(&shape);
         let size = shape.iter().product();
@@ -71,11 +77,7 @@ impl<T: Default + Clone, const D: usize> Tensor<T, D> {
         let strides = Self::compute_strides(&shape);
         Self { data, shape, strides }
     }
-
-    pub fn numel(&self) -> usize {
-        self.data.len()
-    }
-
+    
     pub fn compute_strides(shape: &[usize; D]) -> [usize; D] {
         let mut strides = [0; D];
         let mut stride = 1;
@@ -86,20 +88,12 @@ impl<T: Default + Clone, const D: usize> Tensor<T, D> {
         strides
     }
 
-    pub fn reshape<const D2: usize>(&self, new_shape: [usize; D2]) -> Tensor<T, D2>
-    where
-        T: Clone,
-    {
-        assert_eq!(self.numel(), new_shape.iter().product::<usize>(), "Reshape must not change total size");
-        Tensor {
-            data: self.data.clone(),
-            shape: new_shape,
-            strides: Tensor::<T, D2>::compute_strides(&new_shape),
-        }
-    }
-
     pub fn index_flat(&self, idx: [usize; D]) -> usize {
         idx.iter().zip(&self.strides).map(|(i, s)| i * s).sum()
+    }
+    
+    pub fn numel(&self) -> usize {
+        self.data.len()
     }
 }
 
