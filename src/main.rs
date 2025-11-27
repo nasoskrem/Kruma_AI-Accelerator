@@ -1,72 +1,60 @@
-use kruma::backend::CpuBackend;
-use kruma::tensor::DeviceBuffer;
-use kruma::backend::HardwareBackend;
 use kruma::tensor::Tensor;
+use kruma::nn::{Linear, Tanh, Sequential, Module, Dropout};
+use kruma::optim::Adam;
+use kruma::loss::CrossEntropyLoss;
 use kruma::tensor::ops::TensorOps;
 
-
+//////////////////// CURRENT EXPERIMENT FILE ////////////////////
 fn main() {
-    {
-        let backend = CpuBackend;
+    println!("KRUMA: Multi-Class Classification Challenge");
+    println!("----------------------------------------------");
 
-        let a = DeviceBuffer::from_slice(&[
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0
-        ]);
-        
-        let b = DeviceBuffer::from_slice(&[
-            4.0, 3.0, 2.0, 1.0,
-            4.0, 3.0, 2.0, 1.0,
-            4.0, 3.0, 2.0, 1.0,
-            4.0, 3.0, 2.0, 1.0
-        ]);
-        
-        let mut c = DeviceBuffer::new(16); 
+    // Batch of 6 samples, 3 features
+    let x_train = Tensor::from_data([6, 3], vec![
+        1.0, 0.1, 0.0, // Class 0ish
+        0.9, 0.0, 0.2, // Class 0ish
+        0.1, 1.0, 0.1, // Class 1ish
+        0.0, 0.9, 0.2, // Class 1ish
+        0.1, 0.1, 1.0, // Class 2ish
+        0.2, 0.1, 0.9, // Class 2ish
+    ]);
+    
+    // Targets (One-Hot)
+    let y_train = Tensor::from_data([6, 3], vec![
+        1.0, 0.0, 0.0, 1.0, 0.0, 0.0, // Class 0
+        0.0, 1.0, 0.0, 0.0, 1.0, 0.0, // Class 1
+        0.0, 0.0, 1.0, 0.0, 0.0, 1.0, // Class 2
+    ]);
 
-        println!("Running matrix multiplication...");
-        backend.matmul(&a, &b, &mut c);
-        
-        println!("Matrix multiplication result:");
-        for i in 0..4 {
-            for j in 0..4 {
-                print!("{:5.2} ", c.as_slice()[i * 4 + j]);
-            }
-            println!();
-        }
+    let mut model = Sequential::new(vec![
+        Box::new(Linear::new(3, 8)),
+        Box::new(Tanh::new()),
+        Box::new(Dropout::new(0.2)),
+        Box::new(Linear::new(8, 3)),
+    ]);
 
-        println!("\nApplying ReLU...");
-        backend.relu_inplace(&mut c);
-        
-        println!("After ReLU:");
-        for i in 0..4 {
-            for j in 0..4 {
-                print!("{:5.2} ", c.as_slice()[i * 4 + j]);
-            }
-            println!();
-        }
-    }
-    {
-        let a = Tensor::from_data([2, 2], vec![1.0, 2.0, 3.0, 4.0]);
-        let b = Tensor::from_data([2, 2], vec![5.0, 6.0, 7.0, 8.0]);
+    let mut optimizer = Adam::new(0.01);
+    let criterion = CrossEntropyLoss;
 
-        // Addition
-        let sum = a.add(&b);
-        println!("Addition:\n{:?}", sum);
+    println!("Training for 500 Epochs...");
+    for epoch in 1..=500 {
+        let logits = model.forward(&x_train);
+        let loss = criterion.forward(&logits, &y_train);
 
-        // Multiplication
-        let mul = a.mul(&b);
-        println!("Multiplication:\n{:?}", mul);
+        optimizer.zero_grad(&mut model);
+        let grad = criterion.backward(&logits, &y_train);
+        model.backward(&grad);
+        optimizer.step(&mut model);
 
-        // Matrix Multiplication
-        let matmul = a.matmul(&b);
-        println!("Matrix Multiplication:\n{:?}", matmul);
-
-        // ReLU
-        let c = Tensor::from_data([2, 2], vec![-1.0, 2.0, -3.0, 4.0]);
-        let relu = c.relu();
-        println!("ReLU:\n{:?}", relu);
+        if epoch % 100 == 0 { println!("Epoch [{}/500] Loss: {:.6}", epoch, loss); }
     }
 
+    println!("\n✅ Final Evaluation:");
+    let logits = model.forward(&x_train);
+    let preds = logits.argmax();
+    let targets = y_train.argmax();
+
+    for i in 0..6 {
+        println!("Sample {}: Pred Class {} | True Class {}", i, preds[i], targets[i]);
+    }
 }
