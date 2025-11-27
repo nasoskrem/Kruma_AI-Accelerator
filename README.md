@@ -2,7 +2,6 @@
 
 ![Version](https://img.shields.io/badge/version-0.2.0-blue)
 ![Rust](https://img.shields.io/badge/Made%20With-Rust-informational)
-![Status](https://img-shields.io/badge/status-Advanced%20Prototype-yellowgreen)
 
 **KRUMA** is a low-level, high-performance **CPU-based AI core** built in Rust. Its primary goal is to provide fundamental tensor operations and network abstractions similar to larger frameworks, optimized specifically for standard multi-core CPUs. It leverages **SIMD vectorization** and **multithreading** to achieve significant performance gains.
 
