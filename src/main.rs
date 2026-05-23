@@ -2,28 +2,24 @@ use kruma::tensor::Tensor;
 use kruma::nn::{Linear, Tanh, Sequential, Module, Dropout};
 use kruma::optim::Adam;
 use kruma::loss::CrossEntropyLoss;
-use kruma::tensor::ops::TensorOps;
 
-//////////////////// CURRENT EXPERIMENT FILE ////////////////////
 fn main() {
     println!("KRUMA: Multi-Class Classification Challenge");
     println!("----------------------------------------------");
 
-    // Batch of 6 samples, 3 features
     let x_train = Tensor::from_data([6, 3], vec![
-        1.0, 0.1, 0.0, // Class 0ish
-        0.9, 0.0, 0.2, // Class 0ish
-        0.1, 1.0, 0.1, // Class 1ish
-        0.0, 0.9, 0.2, // Class 1ish
-        0.1, 0.1, 1.0, // Class 2ish
-        0.2, 0.1, 0.9, // Class 2ish
+        1.0, 0.1, 0.0,
+        0.9, 0.0, 0.2,
+        0.1, 1.0, 0.1,
+        0.0, 0.9, 0.2,
+        0.1, 0.1, 1.0,
+        0.2, 0.1, 0.9,
     ]);
     
-    // Targets (One-Hot)
     let y_train = Tensor::from_data([6, 3], vec![
-        1.0, 0.0, 0.0, 1.0, 0.0, 0.0, // Class 0
-        0.0, 1.0, 0.0, 0.0, 1.0, 0.0, // Class 1
-        0.0, 0.0, 1.0, 0.0, 0.0, 1.0, // Class 2
+        1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0, 0.0, 0.0, 1.0,
     ]);
 
     let mut model = Sequential::new(vec![
@@ -46,7 +42,9 @@ fn main() {
         model.backward(&grad);
         optimizer.step(&mut model);
 
-        if epoch % 100 == 0 { println!("Epoch [{}/500] Loss: {:.6}", epoch, loss); }
+        if epoch % 100 == 0 {
+            println!("Epoch [{}/500] Loss: {:.6}", epoch, loss);
+        }
     }
 
     println!("\n✅ Final Evaluation:");

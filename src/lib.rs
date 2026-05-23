@@ -3,3 +3,4 @@ pub mod tensor;
 pub mod nn;
 pub mod optim;
 pub mod loss;
+pub mod utils;

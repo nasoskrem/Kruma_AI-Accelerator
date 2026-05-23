@@ -2,7 +2,6 @@ use kruma::tensor::Tensor;
 use kruma::nn::{Linear, Tanh, Sequential, Module, Dropout};
 use kruma::optim::Adam;
 use kruma::loss::CrossEntropyLoss;
-use kruma::tensor::ops::TensorOps;
 
 fn main() {
     println!("KRUMA: Multi-Class Classification Challenge");

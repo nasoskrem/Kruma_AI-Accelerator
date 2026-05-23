@@ -1,28 +1,28 @@
 use crate::tensor::Tensor;
-use crate::tensor::ops::TensorOps;
+use crate::utils::PseudoRng;
 
-// 1. MODULE TRAIT
-pub trait Module {
-    fn forward(&mut self, input: &Tensor<f32, 2>) -> Tensor<f32, 2>;
-    fn backward(&mut self, grad_output: &Tensor<f32, 2>) -> Tensor<f32, 2>;
+pub trait Module<const D: usize = 2> {
+    fn forward(&mut self, input: &Tensor<f32, D>) -> Tensor<f32, D>;
+    fn backward(&mut self, grad_output: &Tensor<f32, D>) -> Tensor<f32, D>;
     fn params_and_grads(&mut self) -> Vec<(&mut Tensor<f32, 2>, &Tensor<f32, 2>)>;
     fn grads_mut(&mut self) -> Vec<&mut Tensor<f32, 2>>;
 }
 
-// 2. SEQUENTIAL CONTAINER
-pub struct Sequential {
-    layers: Vec<Box<dyn Module>>,
+pub struct Sequential<const D: usize = 2> {
+    layers: Vec<Box<dyn Module<D>>>,
 }
-impl Sequential {
-    pub fn new(layers: Vec<Box<dyn Module>>) -> Self { Self { layers } }
+
+impl<const D: usize> Sequential<D> {
+    pub fn new(layers: Vec<Box<dyn Module<D>>>) -> Self { Self { layers } }
 }
-impl Module for Sequential {
-    fn forward(&mut self, input: &Tensor<f32, 2>) -> Tensor<f32, 2> {
+
+impl<const D: usize> Module<D> for Sequential<D> {
+    fn forward(&mut self, input: &Tensor<f32, D>) -> Tensor<f32, D> {
         let mut x = input.clone();
         for layer in &mut self.layers { x = layer.forward(&x); }
         x
     }
-    fn backward(&mut self, grad_output: &Tensor<f32, 2>) -> Tensor<f32, 2> {
+    fn backward(&mut self, grad_output: &Tensor<f32, D>) -> Tensor<f32, D> {
         let mut grad = grad_output.clone();
         for layer in self.layers.iter_mut().rev() { grad = layer.backward(&grad); }
         grad
@@ -39,7 +39,6 @@ impl Module for Sequential {
     }
 }
 
-// 3. LINEAR LAYER
 pub struct Linear {
     pub weights: Tensor<f32, 2>,
     pub bias: Tensor<f32, 2>,
@@ -47,15 +46,13 @@ pub struct Linear {
     pub d_bias: Tensor<f32, 2>,
     pub input_cache: Option<Tensor<f32, 2>>,
 }
+
 impl Linear {
     pub fn new(in_f: usize, out_f: usize) -> Self {
         let scale = (2.0 / in_f as f32).sqrt();
-        let mut w_data = Vec::with_capacity(in_f * out_f);
-        // Simple pseudo-random init
-        for i in 0..(in_f * out_f) {
-            let val = ((i as f32 * 12.9898).sin() * 43758.5453).fract(); 
-            w_data.push(val * scale);
-        }
+        let size = in_f * out_f;
+        let mut w_data = Vec::with_capacity(size);
+        for i in 0..size { w_data.push(PseudoRng::generate_weight(i, scale)); }
         Self {
             weights: Tensor::from_data([in_f, out_f], w_data),
             bias: Tensor::new([1, out_f]),
@@ -65,36 +62,33 @@ impl Linear {
         }
     }
 }
-impl Module for Linear {
+
+impl Module<2> for Linear {
     fn forward(&mut self, input: &Tensor<f32, 2>) -> Tensor<f32, 2> {
         self.input_cache = Some(input.clone());
         input.matmul(&self.weights).add(&self.bias)
     }
     fn backward(&mut self, grad_output: &Tensor<f32, 2>) -> Tensor<f32, 2> {
-        let input = self.input_cache.as_ref().unwrap();
+        let input = self.input_cache.as_ref().expect("Forward not called");
         self.d_weights = input.transpose().matmul(grad_output);
-        self.d_bias = grad_output.sum_axis0(); // Correctly reduces batch gradient
+        self.d_bias = grad_output.sum_axis0();
         grad_output.matmul(&self.weights.transpose())
     }
     fn params_and_grads(&mut self) -> Vec<(&mut Tensor<f32, 2>, &Tensor<f32, 2>)> {
         vec![(&mut self.weights, &self.d_weights), (&mut self.bias, &self.d_bias)]
     }
-    fn grads_mut(&mut self) -> Vec<&mut Tensor<f32, 2>> {
-        // FIXED: Removed parentheses here
-        vec![&mut self.d_weights, &mut self.d_bias]
-    }
+    fn grads_mut(&mut self) -> Vec<&mut Tensor<f32, 2>> { vec![&mut self.d_weights, &mut self.d_bias] }
 }
 
-// 4. ACTIVATIONS & DROPOUT
-pub struct Tanh { output_cache: Option<Tensor<f32, 2>> }
-impl Tanh { pub fn new() -> Self { Self { output_cache: None } } }
-impl Module for Tanh {
-    fn forward(&mut self, input: &Tensor<f32, 2>) -> Tensor<f32, 2> {
+pub struct Tanh<const D: usize = 2> { output_cache: Option<Tensor<f32, D>> }
+impl<const D: usize> Tanh<D> { pub fn new() -> Self { Self { output_cache: None } } }
+impl<const D: usize> Module<D> for Tanh<D> {
+    fn forward(&mut self, input: &Tensor<f32, D>) -> Tensor<f32, D> {
         let out = input.tanh();
         self.output_cache = Some(out.clone());
         out
     }
-    fn backward(&mut self, grad_output: &Tensor<f32, 2>) -> Tensor<f32, 2> {
+    fn backward(&mut self, grad_output: &Tensor<f32, D>) -> Tensor<f32, D> {
         let out = self.output_cache.as_ref().unwrap();
         let one = Tensor::from_data(out.shape, vec![1.0; out.data.len()]);
         let sq = out.mul(out);
@@ -104,28 +98,36 @@ impl Module for Tanh {
     fn grads_mut(&mut self) -> Vec<&mut Tensor<f32, 2>> { vec![] }
 }
 
-pub struct Dropout {
+pub struct Dropout<const D: usize = 2> {
     pub p: f32,
-    mask: Option<Tensor<f32, 2>>,
+    mask: Option<Tensor<f32, D>>,
+    seed: u32,  
 }
-impl Dropout { pub fn new(p: f32) -> Self { Self { p, mask: None } } }
-impl Module for Dropout {
-    fn forward(&mut self, input: &Tensor<f32, 2>) -> Tensor<f32, 2> {
-        let scale = 1.0 / (1.0 - self.p);
-        let mut mask_data = Vec::with_capacity(input.data.len());
-        let mut seed = 123456789; 
-        for _ in 0..input.data.len() {
-             seed = (1103515245 * seed + 12345) % 2147483647;
-             let val = if (seed as f32 / 2147483648.0) > self.p { 1.0 } else { 0.0 };
-             mask_data.push(val * scale);
+
+impl<const D: usize> Dropout<D> {
+    pub fn new(p: f32) -> Self {
+        Self {
+            p,
+            mask: None,
+            seed: 123456789,
         }
-        let mask = Tensor::from_data(input.shape, mask_data);
-        let out = input.mul(&mask);
-        self.mask = Some(mask);
-        out
     }
-    fn backward(&mut self, grad_output: &Tensor<f32, 2>) -> Tensor<f32, 2> {
-        if let Some(mask) = &self.mask { grad_output.mul(mask) } else { grad_output.clone() }
+}
+
+
+impl<const D: usize> Module<D> for Dropout<D> {
+    fn forward(&mut self, input: &Tensor<f32, D>) -> Tensor<f32, D> {
+        let mask_data = PseudoRng::generate_mask(input.data.len(), self.p, &mut self.seed);
+        let mask = Tensor::from_data(input.shape, mask_data);
+        self.mask = Some(mask.clone());
+        input.mul(&mask)
+    }
+
+    fn backward(&mut self, grad_output: &Tensor<f32, D>) -> Tensor<f32, D> {
+        match &self.mask {
+            Some(mask) => grad_output.mul(mask),
+            None => grad_output.clone(),
+        }
     }
     fn params_and_grads(&mut self) -> Vec<(&mut Tensor<f32, 2>, &Tensor<f32, 2>)> { vec![] }
     fn grads_mut(&mut self) -> Vec<&mut Tensor<f32, 2>> { vec![] }

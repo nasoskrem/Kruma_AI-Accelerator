@@ -1,5 +1,4 @@
 use kruma::tensor::Tensor;
-use kruma::tensor::ops::TensorOps;
 use std::time::Instant;
 
 // STANDARD AI VERIFICATION: Relative Tolerance check.
