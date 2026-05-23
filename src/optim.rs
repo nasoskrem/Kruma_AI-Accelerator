@@ -96,7 +96,7 @@ impl Adam {
 
     fn apply_step_inplace(&self, param: &mut Tensor<f32, 2>, step: &Tensor<f32, 2>) {
         for i in 0..param.data.len() {
-            let clipped = step.data[i].clamp(-1.0, 1.0); // ← clamp μεταξύ -1 και 1
+            let clipped = step.data[i].clamp(-1.0, 1.0); // clamp μεταξύ -1 και 1
             param.data[i] += clipped;
         }
     }

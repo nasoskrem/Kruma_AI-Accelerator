@@ -73,7 +73,7 @@ impl<T: Default + Clone, const D: usize> IndexMut<[usize; D]> for Tensor<T, D> {
     }
 }
 
-// 1. N‑dimensional operations (broadcasting, activations)
+// N‑dimensional operations (broadcasting, activations)
 impl<const D: usize> Tensor<f32, D> {
     pub fn add(&self, other: &Self) -> Self { self.apply_elementwise(other, |a, b| a + b) }
     pub fn sub(&self, other: &Self) -> Self { self.apply_elementwise(other, |a, b| a - b) }
@@ -139,7 +139,7 @@ impl<const D: usize> Tensor<f32, D> {
     }
 }
 
-// 2. 2‑dimensional operations (matmul, softmax, etc.)
+// 2‑dimensional operations (matmul, softmax, etc.)
 impl Tensor<f32, 2> {
     pub fn matmul(&self, other: &Self) -> Self {
         let [m, k1] = self.shape;

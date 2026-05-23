@@ -1,12 +1,12 @@
-# KRUMA — High-Performance CPU AI Core
+# KRUMA - High-Performance CPU AI Core
 
 ![Version](https://img.shields.io/badge/version-0.3-blue)
 ![Rust](https://img.shields.io/badge/Made%20With-Rust-informational)
 ![License](https://img.shields.io/badge/License-MIT-success)
 
-**KRUMA** is a low-level, high-performance **CPU-based AI core** built in stable Rust. Its primary goal is to provide fundamental N-dimensional tensor operations, stateful neural network abstractions, and automatic differentiation algorithms from scratch, without relying on external BLAS libraries or GPU acceleration. 
+**KRUMA** is a low-level, high-performance **CPU-based AI core** built in Rust. Its primary goal is to provide N-dimensional tensor operations, stateful neural network abstractions, and automatic differentiation algorithms from scratch, without relying on external BLAS libraries or GPU acceleration. 
 
-By leveraging **SIMD vectorization (128-bit `f32x4`)**, **cache-aware memory access**, and **thread-level parallelism**, KRUMA achieves orders-of-magnitude speedups over naive CPU implementations.
+By leveraging **SIMD vectorization (128-bit `f32x4`)**, **cache-aware memory access**, and **thread-level parallelism**, KRUMA achieves speedups over naive CPU implementations.
 
 
 ## Core Architecture & Features (v0.3)
