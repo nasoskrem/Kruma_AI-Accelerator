@@ -98,8 +98,8 @@ fn main() {
     }
 
     if errors == 0 {
-        println!("✅ Correctness Check: PASSED (Max Diff: {})", max_diff);
+        println!("Correctness Check: PASSED (Max Diff: {})", max_diff);
     } else {
-        println!("❌ Correctness Check: FAILED with {} errors", errors);
+        println!("Correctness Check: FAILED with {} errors", errors);
     }
 }

@@ -1,12 +1,11 @@
 [package]
-name = "kruma"
-version = "0.1.1"
+name = "Kruma_AI-Accelerator" 
+version = "0.3.1"
 edition = "2024"
 
 [dependencies]
 rayon = "1.12.0"
 wide = "1.4.0"
-rand = "0.10.1"
 
 [build-dependencies]
 cc = "1.2.62"
@@ -26,3 +25,7 @@ path = "experiments/xor.rs"
 [[bin]]
 name = "classes"
 path = "experiments/class_classification.rs"
+
+[lib]
+name = "kruma"
+path = "src/lib.rs"

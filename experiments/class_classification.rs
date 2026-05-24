@@ -31,11 +31,11 @@ fn main() {
         Box::new(Linear::new(8, 3)),
     ]);
 
-    let mut optimizer = Adam::new(0.01);
+    let mut optimizer = Adam::new(0.001);
     let criterion = CrossEntropyLoss;
 
     println!("Training for 500 Epochs...");
-    for epoch in 1..=10 {
+    for epoch in 1..=500 {
         let logits = model.forward(&x_train);
         let loss = criterion.forward(&logits, &y_train);
 
