@@ -81,6 +81,12 @@ impl Module<2> for Linear {
 }
 
 pub struct Tanh<const D: usize = 2> { output_cache: Option<Tensor<f32, D>> }
+impl<const D: usize> Default for Tanh<D> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const D: usize> Tanh<D> { pub fn new() -> Self { Self { output_cache: None } } }
 impl<const D: usize> Module<D> for Tanh<D> {
     fn forward(&mut self, input: &Tensor<f32, D>) -> Tensor<f32, D> {

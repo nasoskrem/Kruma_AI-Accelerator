@@ -2,7 +2,7 @@ pub struct PseudoRng;
 
 impl PseudoRng {
     const SINE_FREQ: f32 = 12.9898;
-    const AMPLITUDE: f32 = 43758.5453;
+    const AMPLITUDE: f32 = 43_758.547;
     const LCG_A: u32 = 1103515245;
     const LCG_C: u32 = 12345;
     const LCG_M: f32 = 2147483648.0;
