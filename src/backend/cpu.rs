@@ -7,78 +7,16 @@ pub struct CpuBackend;
 
 impl HardwareBackend for CpuBackend {
     fn matmul(&self, a: &DeviceBuffer, b: &DeviceBuffer, c: &mut DeviceBuffer, m: usize, k: usize, n: usize) {
-        let a_slice = a.as_slice();
-        let b_slice = b.as_slice();
-        let c_slice = c.as_mut_slice();
+        let (a_slice, b_slice, c_slice) = (a.as_slice(), b.as_slice(), c.as_mut_slice());
+        
+        assert_eq!((a_slice.len(), b_slice.len(), c_slice.len()), (m * k, k * n, m * n));
 
-        assert_eq!(a_slice.len(), m * k);
-        assert_eq!(b_slice.len(), k * n);
-        assert_eq!(c_slice.len(), m * n);
-
-        // Parallel Transpose B to ensure sequential memory access
         let b_transposed = self.transpose_b(b_slice, k, n);
 
-        // pre calculate SIMD boundaries
-        let simd_k = k / 4;
-        let remainder = k % 4;
-
-        // Parallelize over rows of C
-        c_slice
-            .par_chunks_mut(n)
-            .enumerate()
-            .for_each(|(i, c_row)| {
-
-                // Slices for the current row of A
-                let a_row = &a_slice[i * k .. (i + 1) * k];
-
-                // Cast to SIMD slice
-                let a_simd = unsafe { 
-                    std::slice::from_raw_parts(a_row.as_ptr() as *const f32x4, simd_k) 
-                };
-
-                for j in 0..n {
-                    let b_row = &b_transposed[j * k .. (j + 1) * k];
-                    
-                    let b_simd = unsafe { 
-                        std::slice::from_raw_parts(b_row.as_ptr() as *const f32x4, simd_k) 
-                    };
-
-                    // Instruction-Level Parallelis
-                    let mut sum0 = f32x4::ZERO;
-                    let mut sum1 = f32x4::ZERO;
-                    let mut sum2 = f32x4::ZERO;
-                    let mut sum3 = f32x4::ZERO;
-
-                    let mut idx = 0;
-
-                    // Process 16 floats (4 SIMD vectors) per loop iteration
-                    while idx + 3 < simd_k {
-                        sum0 += a_simd[idx] * b_simd[idx];
-                        sum1 += a_simd[idx + 1] * b_simd[idx + 1];
-                        sum2 += a_simd[idx + 2] * b_simd[idx + 2];
-                        sum3 += a_simd[idx + 3] * b_simd[idx + 3];
-                        idx += 4;
-                    }
-
-                    // Handle remaining SIMD vectors (if simd_k is not a multiple of 4)
-                    while idx < simd_k {
-                        sum0 += a_simd[idx] * b_simd[idx];
-                        idx += 1;
-                    }
-
-                    // Single horizontal addition of the vectors
-                    let mut total = (sum0 + sum1 + sum2 + sum3).reduce_add();
-
-                    // SCALAR CLEANUP LOOP
-                    // Handle the remaining 1, 2, or 3 floats if k is not a clean multiple of 4
-                    for x in 0..remainder {
-                        let scalar_idx = (simd_k * 4) + x;
-                        total += a_row[scalar_idx] * b_row[scalar_idx];
-                    }
-
-                    c_row[j] = total;
-                }
-            });
+        c_slice.par_chunks_mut(n).enumerate().for_each(|(i, c_row)| {
+            let a_row = &a_slice[i * k .. (i + 1) * k];
+            self.process_row(c_row, a_row, &b_transposed, k, n);
+        });
     }
 
     fn relu(&self, input: &DeviceBuffer, output: &mut DeviceBuffer) {
@@ -171,6 +109,7 @@ impl HardwareBackend for CpuBackend {
                 *out_val = sum;
             });
     }
+    
 }
 
 impl CpuBackend {
@@ -182,5 +121,51 @@ impl CpuBackend {
             }
         });
         b_t
+    }
+    
+    #[inline]
+    fn process_row(&self, c_row: &mut [f32], a_row: &[f32], b_transposed: &[f32], k: usize, n: usize) {
+        let simd_k = k / 4;
+        let a_simd = unsafe { std::slice::from_raw_parts(a_row.as_ptr() as *const f32x4, simd_k) };
+
+        for j in 0..n {
+            let b_row = &b_transposed[j * k .. (j + 1) * k];
+            let b_simd = unsafe { std::slice::from_raw_parts(b_row.as_ptr() as *const f32x4, simd_k) };
+            
+            c_row[j] = self.compute_dot(a_row, b_row, a_simd, b_simd, k);
+        }
+    }
+
+    #[inline]
+    fn compute_dot(&self, a_row: &[f32], b_row: &[f32], a_simd: &[f32x4], b_simd: &[f32x4], k: usize) -> f32 {
+        let mut total = self.simd_ilp_sum(a_simd, b_simd);
+        let remainder = k % 4;
+        let simd_offset = (k / 4) * 4;
+        
+        for x in 0..remainder {
+            let idx = simd_offset + x;
+            total += a_row[idx] * b_row[idx];
+        }
+        
+        total
+    }
+
+    #[inline]
+    fn simd_ilp_sum(&self, a_simd: &[f32x4], b_simd: &[f32x4]) -> f32 {
+        let (mut s0, mut s1, mut s2, mut s3) = (f32x4::ZERO, f32x4::ZERO, f32x4::ZERO, f32x4::ZERO);
+        let mut idx = 0;
+
+        while idx + 3 < a_simd.len() {
+            s0 += a_simd[idx] * b_simd[idx];     s1 += a_simd[idx+1] * b_simd[idx+1];
+            s2 += a_simd[idx+2] * b_simd[idx+2]; s3 += a_simd[idx+3] * b_simd[idx+3];
+            idx += 4;
+        }
+
+        while idx < a_simd.len() {
+            s0 += a_simd[idx] * b_simd[idx];
+            idx += 1;
+        }
+
+        (s0 + s1 + s2 + s3).reduce_add()
     }
 }
