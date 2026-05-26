@@ -1,3 +1,4 @@
+#![crate_name = "kruma"] // Auto Documentation
 pub mod backend;
 pub mod tensor;
 pub mod nn;

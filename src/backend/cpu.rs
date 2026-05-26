@@ -1,7 +1,7 @@
-use crate::backend::HardwareBackend;
 use crate::tensor::DeviceBuffer;
 use rayon::prelude::*;
 use wide::f32x4;
+use crate::backend::{SimdSliceExt, HardwareBackend};
 
 pub struct CpuBackend;
 
@@ -125,12 +125,11 @@ impl CpuBackend {
     
     #[inline]
     fn process_row(&self, c_row: &mut [f32], a_row: &[f32], b_transposed: &[f32], k: usize, n: usize) {
-        let simd_k = k / 4;
-        let a_simd = unsafe { std::slice::from_raw_parts(a_row.as_ptr() as *const f32x4, simd_k) };
+        let a_simd = SimdSliceExt::as_simd(a_row);
 
         for j in 0..n {
             let b_row = &b_transposed[j * k .. (j + 1) * k];
-            let b_simd = unsafe { std::slice::from_raw_parts(b_row.as_ptr() as *const f32x4, simd_k) };
+            let b_simd = SimdSliceExt::as_simd(b_row);
             
             c_row[j] = self.compute_dot(a_row, b_row, a_simd, b_simd, k);
         }

@@ -1,5 +1,4 @@
 use std::ops::{Index, IndexMut};
-use wide::f32x4;
 use crate::backend::{CpuBackend, HardwareBackend};
 
 /// A contiguous, 1-dimensional memory buffer used to interface with the hardware backend.
@@ -29,18 +28,6 @@ impl DeviceBuffer {
 
     /// Returns a mutable slice representing the buffer's data.
     pub fn as_mut_slice(&mut self) -> &mut [f32] { &mut self.data }
-
-    /// Reinterprets the float data as chunks of 4 (`f32x4`) for SIMD ops.
-    pub fn as_simd(&self) -> &[f32x4] {
-        assert_eq!(self.data.len() % 4, 0);
-        unsafe { std::slice::from_raw_parts(self.data.as_ptr() as *const f32x4, self.data.len() / 4) }
-    }
-
-    /// Reinterprets the float data as mut chunks of 4 (`f32x4`) for SIMD ops.
-    pub fn as_mut_simd(&mut self) -> &mut [f32x4] {
-        assert_eq!(self.data.len() % 4, 0);
-        unsafe { std::slice::from_raw_parts_mut(self.data.as_mut_ptr() as *mut f32x4, self.data.len() / 4) }
-    }
 }
 
 /// # A Tensor.
